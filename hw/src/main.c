@@ -45,8 +45,7 @@
 #define enableTimer0OvfInterrupt() (TIMSK |= (1 << TOIE0))
 #define disableTimer0OvfInterrupt() (TIMSK &= ~(1 << TOIE0))
 
-#define USB_RXTX_BUFF_SIZE 4
-//static uint8_t usbBuff[USB_RXTX_BUFF_SIZE];
+#define USB_STATE_REQ 0xa6 //10100110 seems ok
 static volatile uint8_t btnState = 0;
 //////////////////////////////////////////////////////////////////////////
 
@@ -54,15 +53,25 @@ static void initUsbTtl();
 static void initTimer0();
 //////////////////////////////////////////////////////////////////////////
 
-ISR(USART_RX_vect) {
+ISR(USART_RX_vect) {  
+  disableUsbRxInterrupt();
+  uint8_t rx = UDR;
+  if (rx == USB_STATE_REQ) {
+    enableUsbUDRIsEmptyInterrupt();
+  } else {
+    enableUsbRxInterrupt();
+  }
 }
 //////////////////////////////////////////////////////////////////////////
 
-ISR(USART_TX_vect) {
+ISR(USART_TX_vect) {  
+  enableUsbRxInterrupt();
 }
 //////////////////////////////////////////////////////////////////////////
 
 ISR(USART_UDRE_vect) {  
+  UDR = btnState;
+  disableUsbUDRIsEmptyInterrupt();
 }
 //////////////////////////////////////////////////////////////////////////
 
@@ -102,8 +111,7 @@ void initUsbTtl() {
   enableUsbTransmitter();
 
   enableUsbRxInterrupt();
-  enableUsbTxInterrupt();
-  enableUsbUDRIsEmptyInterrupt();
+  enableUsbTxInterrupt();  
 
   UCSRC = 0x00         |                // UMSEL0 = UMSEL1 = 0 - async
           (0 << UPM0)  | (0 << UPM1)  | // parity none
