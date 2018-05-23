@@ -3,18 +3,22 @@
 #include <stdint.h>
 
 #define F_CPU         8000000UL
-#define USB_BAUD_RATE 9600UL
-#define USB_UBRR_VAL  (F_CPU/(16*USB_BAUD_RATE) - 1)
-
-#define BLUETOOTH_FREQ      1000000UL
 #define BLUETOOTH_BAUD_RATE 9600UL
-#define BLUETOOTH_UBRR_VAL   (BLUETOOTH_FREQ/(2*BLUETOOTH_BAUD_RATE))
+#define BLUETOOTH_UBRR_VAL  (F_CPU/(16*BLUETOOTH_BAUD_RATE) - 1)
 
-#define BLUETOOTH_DDR     DDRD
-#define BLUETOOTH_PORT    PORTD
-#define BLUETOOTH_PIN     PIND
-#define BLUETOOTH_RX_PIN  (1 << PIND2)
-#define BLUETOOTH_TX_PORT (1 << PORTD3)
+#define BLUETOOTH_PORT  PORTD
+#define BLUETOOTH_PIN   PIND
+
+#define USB_FREQ      1000000UL
+#define USB_BAUD_RATE 9600UL
+#define USB_UBRR_VAL   (USB_FREQ/(2*USB_BAUD_RATE))
+
+#define USB_DDR     DDRD
+#define USB_PORT    PORTD
+#define USB_PIN     PIND
+
+#define USB_RX_PIN  (1 << PIND2)
+#define USB_TX_PORT (1 << PORTD3)
 
 #define DDR_BTN    DDRD
 #define PIN_BTN    PIND
@@ -31,11 +35,6 @@
 #define led_green_off() (LED_PORT &= ~LED_GREEN)
 #define led_red_on()    (LED_PORT |= LED_RED)
 #define led_red_off()   (LED_PORT &= ~LED_RED)
-
-#define USB_PORT  PORTD
-#define USB_PIN   PIND
-#define USB_TX    (1 << PORTD4)
-#define USB_RX    (1 << PIND2) //int0
 
 #define enableUsbRxInterrupt()  (UCSRB |=  (1 << RXCIE))
 #define disableUsbRxInterrupt() (UCSRB &= ~(1 << RXCIE))
@@ -114,7 +113,7 @@ ISR(TIMER0_OVF_vect) {
 //start of transmission
 ISR(INT0_vect) {
   disableInt0Interrupt();
-  OCR1A = TCNT1+BLUETOOTH_UBRR_VAL;
+  OCR1A = TCNT1+USB_UBRR_VAL;
   enableTimer1CompAInterrupt();
 }
 //////////////////////////////////////////////////////////////////////////
@@ -124,8 +123,8 @@ static volatile uint8_t btrx_count = 0;
 static volatile uint8_t bt_received = 0;
 //rx timer
 ISR(TIMER1_COMPA_vect) {
-  register uint8_t rx_state = BLUETOOTH_RX_PIN & BLUETOOTH_PIN;
-  OCR1A += BLUETOOTH_UBRR_VAL;
+  register uint8_t rx_state = USB_RX_PIN & USB_PIN;
+  OCR1A += USB_UBRR_VAL;
   if (++btrx_count == 1) {
     btrx_buff = 0;
     if (rx_state) { //high level is not valid start bit
@@ -156,11 +155,11 @@ static volatile uint8_t bttx_count;
 
 //tx timer
 ISR(TIMER1_COMPB_vect) {
-  OCR1B += BLUETOOTH_UBRR_VAL;
+  OCR1B += USB_UBRR_VAL;
   if (++bttx_count == 18) {
     disableTimer1CompBInterrupt();
     bttx_count = 0;
-    BLUETOOTH_PORT |= BLUETOOTH_TX_PORT;
+    USB_PORT |= USB_TX_PORT;
     return;
   }
 
@@ -168,9 +167,9 @@ ISR(TIMER1_COMPB_vect) {
     return;
 
   if (bttx_buff & 0x01) //LSB
-    BLUETOOTH_PORT |= BLUETOOTH_TX_PORT;
+    USB_PORT |= USB_TX_PORT;
   else
-    BLUETOOTH_PORT &= ~BLUETOOTH_TX_PORT;
+    USB_PORT &= ~USB_TX_PORT;
   bttx_buff >>= 1;
 }
 //////////////////////////////////////////////////////////////////////////
@@ -180,9 +179,9 @@ int main(void) {
   PORT_BTN |= PORT_BTNIN; //pull up
   DDR_LED = LED_GREEN | LED_RED;
 
-  BLUETOOTH_DDR  |= BLUETOOTH_TX_PORT;
-  BLUETOOTH_DDR &= ~(BLUETOOTH_RX_PIN);
-  BLUETOOTH_PORT |= BLUETOOTH_TX_PORT;
+  USB_DDR  |= USB_TX_PORT;
+  USB_DDR &= ~(USB_RX_PIN);
+  USB_PORT |= USB_TX_PORT;
 
   initUsbTtl();
   initTimer0();
@@ -196,8 +195,8 @@ int main(void) {
       if (btrx_buff == STATE_REQ && !bttx_count) { //state request && transmission isn't in progress
         bttx_count = 0;
         bttx_buff = btnState;
-        OCR1B = TCNT1 + BLUETOOTH_UBRR_VAL;
-        BLUETOOTH_PORT &= ~BLUETOOTH_TX_PORT; //startbit
+        OCR1B = TCNT1 + USB_UBRR_VAL;
+        USB_PORT &= ~USB_TX_PORT; //startbit
         enableTimer1CompBInterrupt();
       }
       bt_received = 0;
