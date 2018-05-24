@@ -17,8 +17,9 @@
 #define USB_PORT    PORTD
 #define USB_PIN     PIND
 
-#define USB_RX_PIN  (1 << PIND2)
-#define USB_TX_PORT (1 << PORTD3)
+#define USB_RX_PIN  (1 << PIND3)
+#define USB_TX_PORT (1 << PORTD2)
+#define USB_RX_PULL_UP (1 << PORTD3)
 
 #define DDR_BTN    DDRD
 #define PIN_BTN    PIND
@@ -54,8 +55,8 @@
 #define enableTimer0OvfInterrupt()  (TIMSK |=  (1 << TOIE0))
 #define disableTimer0OvfInterrupt() (TIMSK &= ~(1 << TOIE0))
 
-#define enableInt0Interrupt()  (GIMSK |=  (1 << INT0))
-#define disableInt0Interrupt() (GIMSK &= ~(1 << INT0))
+#define enableInt1Interrupt()  (GIMSK |=  (1 << INT1))
+#define disableInt1Interrupt() (GIMSK &= ~(1 << INT1))
 
 #define enableTimer1CompAInterrupt()  (TIMSK |=  (1 << OCIE1A))
 #define disableTimer1CompAInterrupt() (TIMSK &= ~(1 << OCIE1A))
@@ -70,7 +71,7 @@ static volatile uint8_t btnState = 0;
 static void initUsbTtl();
 static void initTimer0();
 static void initTimer1();
-static void initInt0();
+static void initInt1();
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -111,12 +112,18 @@ ISR(TIMER0_OVF_vect) {
 //////////////////////////////////////////////////////////////////////////
 
 //start of transmission
-ISR(INT0_vect) {
-  disableInt0Interrupt();
+//ISR(INT0_vect) {
+//  disableInt0Interrupt();
+//  OCR1A = TCNT1+USB_UBRR_VAL;
+//  enableTimer1CompAInterrupt();
+//}
+//////////////////////////////////////////////////////////////////////////
+
+ISR(INT1_vect) {
+  disableInt1Interrupt();
   OCR1A = TCNT1+USB_UBRR_VAL;
   enableTimer1CompAInterrupt();
 }
-//////////////////////////////////////////////////////////////////////////
 
 static volatile uint8_t btrx_buff = 0;
 static volatile uint8_t btrx_count = 0;
@@ -130,7 +137,7 @@ ISR(TIMER1_COMPA_vect) {
     if (rx_state) { //high level is not valid start bit
       btrx_count = 0;
       disableTimer1CompAInterrupt();
-      enableInt0Interrupt();
+      enableInt1Interrupt();
     }
     return;
   }
@@ -182,11 +189,12 @@ int main(void) {
   USB_DDR  |= USB_TX_PORT;
   USB_DDR &= ~(USB_RX_PIN);
   USB_PORT |= USB_TX_PORT;
+  USB_PORT |= USB_RX_PULL_UP;
 
   initUsbTtl();
   initTimer0();
   initTimer1();
-  initInt0();
+  initInt1();
 
   sei();
 
@@ -200,7 +208,7 @@ int main(void) {
         enableTimer1CompBInterrupt();
       }
       bt_received = 0;
-      enableInt0Interrupt();
+      enableInt1Interrupt();
     }
   }
   return 0;
@@ -237,8 +245,8 @@ void initTimer1() {
 }
 //////////////////////////////////////////////////////////////////////////
 
-void initInt0() {
-  MCUCR = 1 << ISC11; // The falling edge of INT0 generates an interrupt request.
-  enableInt0Interrupt();
+void initInt1() {
+  MCUCR = 1 << ISC11; // The falling edge of INT1 generates an interrupt request.
+  enableInt1Interrupt();
 }
 //////////////////////////////////////////////////////////////////////////
