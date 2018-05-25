@@ -2,14 +2,13 @@
 #include <avr/interrupt.h>
 #include <stdint.h>
 
-#define F_CPU         8000000UL
+#define F_CPU         8000000UL //частота процессора
 #define BLUETOOTH_BAUD_RATE 9600UL
-#define BLUETOOTH_UBRR_VAL  (F_CPU/(16*BLUETOOTH_BAUD_RATE) - 1)
-
+#define BLUETOOTH_UBRR_VAL  (F_CPU/(16*BLUETOOTH_BAUD_RATE) - 1) //специальное значение для UART модуля
 #define BLUETOOTH_PORT  PORTD
 #define BLUETOOTH_PIN   PIND
 
-#define USB_FREQ      1000000UL
+#define USB_FREQ      1000000UL //частота процессора с предделителем 8 для software uart
 #define USB_BAUD_RATE 9600UL
 #define USB_UBRR_VAL   (USB_FREQ/(2*USB_BAUD_RATE))
 
@@ -37,20 +36,20 @@
 #define led_red_on()    (LED_PORT |= LED_RED)
 #define led_red_off()   (LED_PORT &= ~LED_RED)
 
-#define enableUsbRxInterrupt()  (UCSRB |=  (1 << RXCIE))
-#define disableUsbRxInterrupt() (UCSRB &= ~(1 << RXCIE))
+#define enableBtRxInterrupt()  (UCSRB |=  (1 << RXCIE))
+#define disableBtRxInterrupt() (UCSRB &= ~(1 << RXCIE))
 
-#define enableUsbTxInterrupt()  (UCSRB |=  (1 << TXCIE))
-#define disableUsbTxInterrupt() (UCSRB &= ~(1 << TXCIE))
+#define enableBtTxInterrupt()  (UCSRB |=  (1 << TXCIE))
+#define disableBtTxInterrupt() (UCSRB &= ~(1 << TXCIE))
 
-#define enableUsbUDRIsEmptyInterrupt()  (UCSRB |=  (1 << UDRIE))
-#define disableUsbUDRIsEmptyInterrupt() (UCSRB &= ~(1 << UDRIE))
+#define enableBtUDRIsEmptyInterrupt()  (UCSRB |=  (1 << UDRIE))
+#define disableBtUDRIsEmptyInterrupt() (UCSRB &= ~(1 << UDRIE))
 
-#define enableUsbReceiver()   (UCSRB |=  (1 << RXEN))
-#define disableUsbReceiver()  (UCSRB &= ~(1 << RXEN))
+#define enableBtReceiver()   (UCSRB |=  (1 << RXEN))
+#define disableBtReceiver()  (UCSRB &= ~(1 << RXEN))
 
-#define enableUsbTransmitter()  (UCSRB |=  (1 << TXEN))
-#define disableUsbTransmitter() (UCSRB &= ~(1 << TXEN))
+#define enableBtTransmitter()  (UCSRB |=  (1 << TXEN))
+#define disableBtTransmitter() (UCSRB &= ~(1 << TXEN))
 
 #define enableTimer0OvfInterrupt()  (TIMSK |=  (1 << TOIE0))
 #define disableTimer0OvfInterrupt() (TIMSK &= ~(1 << TOIE0))
@@ -76,24 +75,24 @@ static void initInt1();
 //////////////////////////////////////////////////////////////////////////
 
 ISR(USART_RX_vect) {  
-  disableUsbRxInterrupt();
+  disableBtRxInterrupt();
   uint8_t rx = UDR;
   if (rx == STATE_REQ) {
-    enableUsbUDRIsEmptyInterrupt();
+    enableBtUDRIsEmptyInterrupt();
   } else {
-    enableUsbRxInterrupt();
+    enableBtRxInterrupt();
   }
 }
 //////////////////////////////////////////////////////////////////////////
 
 ISR(USART_TX_vect) {  
-  enableUsbRxInterrupt();
+  enableBtRxInterrupt();
 }
 //////////////////////////////////////////////////////////////////////////
 
 ISR(USART_UDRE_vect) {  
   UDR = btnState;
-  disableUsbUDRIsEmptyInterrupt();
+  disableBtUDRIsEmptyInterrupt();
 }
 //////////////////////////////////////////////////////////////////////////
 
@@ -220,11 +219,11 @@ void initUsbTtl() {
   UBRRH = (uint8_t)(USB_UBRR_VAL >> 8);
   UBRRL = (uint8_t) USB_UBRR_VAL;
 
-  enableUsbReceiver();
-  enableUsbTransmitter();
+  enableBtReceiver();
+  enableBtTransmitter();
 
-  enableUsbRxInterrupt();
-  enableUsbTxInterrupt();
+  enableBtRxInterrupt();
+  enableBtTxInterrupt();
 
   UCSRC = 0x00         |                // UMSEL0 = UMSEL1 = 0 - async
           (0 << UPM0)  | (0 << UPM1)  | // parity none
