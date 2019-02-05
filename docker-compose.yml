@@ -1,0 +1,10 @@
+version: "3"
+
+services:
+  water_bot:
+    build: ./bot
+    devices:
+      - "/dev/rfcomm0:dev/rfcomm0"
+    environment:
+      TELEGRAM_TOKEN: zhuk_s_gory
+      CHANNEL_ID: channel_kochanel
