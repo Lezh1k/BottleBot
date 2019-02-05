@@ -3,11 +3,12 @@ package main
 import (
 	"fmt"
 	"log"
-	"math/rand"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/tarm/serial"
 
 	"github.com/go-telegram-bot-api/telegram-bot-api"
 )
@@ -40,10 +41,18 @@ func main() {
 		}
 	}(errCh)
 
-	go func(ch <-chan int) {
-		for wq := range ch {
-			if wq < 1 {
-				msg := tgbotapi.NewMessage(int64(channel), "Осталось меньше 1 литра!!!")
+	botReceivedAnswerFromUser := false
+	go func(ch <-chan bool) {
+		const fiveMinutes = 60 * 5
+		count := 0
+		for pressed := range ch {
+			if pressed {
+				count = 0
+				continue
+			}
+			count++
+			if count >= fiveMinutes && !botReceivedAnswerFromUser {
+				msg := tgbotapi.NewMessage(int64(channel), "На платформе нет воды. Засыхаем!")
 				bot.Send(msg)
 			}
 		}
@@ -57,6 +66,13 @@ func main() {
 		}
 
 		if strings.Contains(update.Message.Text, "@"+bot.Self.UserName) && strings.Contains(update.Message.Text, "заказали") && strings.Contains(update.Message.Text, "воду") && strings.Contains(update.Message.Text, "брат") {
+			if !botReceivedAnswerFromUser {
+				go func() {
+					time.Sleep(time.Hour * 24)
+					botReceivedAnswerFromUser = false
+				}()
+			}
+			botReceivedAnswerFromUser = true
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "понял тебя, брат!")
 			msg.ReplyToMessageID = update.Message.MessageID
 			bot.Send(msg)
@@ -65,23 +81,46 @@ func main() {
 }
 
 //PingPlatform pings platform to get current water quantity, if unable to reach the platform, sends error
-func PingPlatform() (<-chan int, <-chan error) {
+func PingPlatform() (<-chan bool, <-chan error) {
 
-	ch := make(chan int, 1)
-	errCh := make(chan error, 1)
+	const chkCmd = 0xa6 //see hw part
+	buf := make([]byte, 8)
+	scfg := &serial.Config{Name: "/dev/rfcomm0", Baud: 9600}
+	chData := make(chan bool)
+	chError := make(chan error)
+
+	//returns true if there is water bottle on platform. false otherwise
+	pfCheckPressed := func(buf []byte) (bool, error) {
+		sp, err := serial.OpenPort(scfg)
+		if err != nil {
+			return false, err
+		}
+		defer sp.Close()
+		n, err := sp.Write([]byte{chkCmd})
+		if err != nil {
+			return false, err
+		}
+		n, err = sp.Read(buf)
+		if err != nil {
+			return false, err
+		}
+		if n != 1 || (buf[0] != 0x00 && buf[0] != 0x20) {
+			return false, fmt.Errorf("Wrong data from platform : %v", buf[:n])
+		}
+		return buf[0] == 0x00, nil
+	}
 
 	go func() {
 		for {
-
-			//dummy data code to check if bot is working
-			random := rand.New(rand.NewSource(time.Now().UnixNano()))
-			waterQuantity := random.Intn(20)
-			fmt.Println("New Water Quantity: ", waterQuantity)
-			ch <- waterQuantity
-			errCh <- nil
 			time.Sleep(1 * time.Second)
+			pressed, err := pfCheckPressed(buf)
+			if err != nil {
+				chError <- err
+				continue
+			}
+			chData <- pressed
 		}
 	}()
 
-	return ch, errCh
+	return chData, chError
 }
