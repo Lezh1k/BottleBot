@@ -10,4 +10,5 @@
 * quit
 4. Instal rfcomm tool (bluez-rfcomm for arch linux).
 5. Run `rfcomm bind rfcomm0 98:D3:31:F4:11:FF`
+5.1  `sudo chmod a+rw /dev/rfcomm0`
 6. Use /dev/rfcomm0 as serial port
