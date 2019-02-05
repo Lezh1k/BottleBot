@@ -1,4 +1,4 @@
-**Bluetooth
+## Bluetooth
 
 1. Install bluez and bluez-tools. Start and enable bluetooth.service via systemctl.
 2. From cli run `sudo bluetoothctl`.
