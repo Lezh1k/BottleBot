@@ -6,5 +6,6 @@ services:
     devices:
       - "/dev/rfcomm0:dev/rfcomm0"
     environment:
-      TELEGRAM_TOKEN: zhuk_s_gory
-      CHANNEL_ID: channel_kochanel
+      TELEGRAM_TOKEN: token_s_gory 
+      CHANNEL_ID: chanel_v_kochanel
+      SERIAL_PORT: "/dev/rfcomm0"
