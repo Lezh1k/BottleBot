@@ -77,7 +77,7 @@ func main() {
 			if count >= timeoutSec && !botReceivedAnswerFromUser {
 				msg := tgbotapi.NewMessage(int64(channel), "На платформе нет воды. Засыхаем!")
 				bot.Send(msg)
-				time.Sleep(time.Minute * 1)
+				time.Sleep(time.Minute * 5)
 			}
 		}
 	}(ch)
